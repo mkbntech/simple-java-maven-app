@@ -1,17 +1,42 @@
 pipeline {
-    agent any
+    agent {
+        kubernetes {
+            yaml '''
+              apiVersion: v1
+              kind: Pod
+              spec:
+                containers:
+                - name: maven
+                  image: maven:3.9.9-eclipse-temurin-21
+                  command:
+                  - sleep
+                  args:
+                  - infinity
+                  volumeMounts:
+                  - name: maven-cache
+                    mountPath: /root/.m2
+                volumes:
+                - name: maven-cache
+                  emptyDir: {}
+            '''
+        }
+    }
     options {
         skipStagesAfterUnstable()
     }
     stages {
         stage('Build') {
             steps {
-                sh 'mvn -B -DskipTests clean package'
+                container('maven') {
+                    sh 'mvn -B -DskipTests clean package'
+                }
             }
         }
         stage('Test') {
             steps {
-                sh 'mvn test'
+                container('maven') {
+                    sh 'mvn test'
+                }
             }
             post {
                 always {
@@ -21,7 +46,9 @@ pipeline {
         }
         stage('Deliver') { 
             steps {
-                sh './jenkins/scripts/deliver.sh' 
+                container('maven') {
+                    sh './jenkins/scripts/deliver.sh' 
+                }
             }
         }
     }
